@@ -1,19 +1,55 @@
 "use client";
-import { useState, ChangeEvent } from "react";
+import React, { useState, ChangeEvent } from "react";
 import { SiGooglegemini } from "react-icons/si";
 import { AiOutlineReload } from "react-icons/ai";
 import { FaFileAlt } from "react-icons/fa";
+
+type DetectedObject = {
+  label: string;
+  score: number;
+  box: { xmin: number; ymin: number; xmax: number; ymax: number };
+};
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState(1);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [objects, setObjects] = useState<DetectedObject[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
       return;
     }
+    setSelectedFile(file);
     setPreviewUrl(URL.createObjectURL(file));
+    setObjects([]);
   };
+  const handleDetect = async () => {
+    if (!selectedFile) return;
+    setLoading(true);
+    setObjects([]);
+
+    try {
+      const formData = new FormData();
+      formData.append("image", selectedFile);
+
+      const data = await (
+        await fetch("/api/object-detection", {
+          method: "POST",
+          body: formData,
+        })
+      ).json();
+
+      setObjects(data.objects || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  console.log(objects, "wyuegfabkuwydsg");
 
   return (
     <>
@@ -70,7 +106,7 @@ export default function Home() {
                   <input
                     type="file"
                     accept="image/png, image/jpeg"
-                    onChange={handleImageChange}
+                    onChange={handleImageUpload}
                     className="border border-gray-300 px-3 py-2 rounded w-full"
                   />
                 </div>
@@ -85,8 +121,13 @@ export default function Home() {
                 )}
                 <div className="flex justify-between pt-2">
                   <p></p>
-                  <button className="px-4 py-2 bg-gray-600 text-white rounded ">
+                  <button
+                    className="px-4 py-2 bg-gray-600 text-white rounded "
+                    onClick={handleDetect}
+                    disabled={loading}
+                  >
                     Generate
+                    {loading ? "..." : ""}
                   </button>
                 </div>
                 <div className="flex gap-3 items-center">
@@ -95,9 +136,21 @@ export default function Home() {
                     Here is the summary
                   </p>
                 </div>
-                <p className="text-gray-400 ">
-                  First, enter your image to recognize an ingredients.
-                </p>
+                <textarea
+                  className="text-black w-full "
+                  placeholder="First, enter your image to recognize an ingredients."
+                  value={
+                    objects.length > 0
+                      ? objects
+                          .map(
+                            (obj) =>
+                              `${obj.label} — ${Math.round(obj.score * 100)}%`
+                          )
+                          .join("\n")
+                      : ""
+                  }
+                  readOnly
+                ></textarea>
               </>
             )}
             {activeTab === 2 && (
@@ -117,7 +170,7 @@ export default function Home() {
                   </div>
                 </div>
                 <p className="text-gray-400 pt-5">
-                  Upload a food photo, and AI will detect the ingredients.
+                  Describe the food, and AI will detect the ingredients.
                 </p>
                 <div className=" pt-2">
                   <textarea
